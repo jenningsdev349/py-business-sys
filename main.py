@@ -1,11 +1,9 @@
 import pandas as pd
 import sqlite3
+import random
 
-#Issues to fix: 
-# - code repeats: checking if employee exists, make into function
-# - update employeeID code to new standard and ensure new employeeIDs follow this standard
-# - update display_employees() to have the function to display all employees - also give options to sort output by different parameters
-# -
+#Issues to fix:
+# - ensure that no 2 IDs can be the same
 
 con = sqlite3.connect("employees.db")
 cur = con.cursor()
@@ -14,13 +12,15 @@ cur.execute("CREATE TABLE if NOT EXISTS Employees(EmployeeID, Name, Branch, Age,
 
 def add_employees():
     cur.execute("SELECT * from Employees") #counts all rows in Employees table 
-    results = cur.fetchall() #assign them to results
-    emp_id = len(results) + 1 #emp_id is the number of results + 1 
     emp_name = str(input("Please enter Employee's name: "))
     emp_branch = str(input("Please enter Employee's branch: "))
     emp_age = int(input("Please enter Employee's age: "))
     emp_salary = float(input("Please enter Employee's salary: "))
     
+    number = random.randint(0,9999)
+    letter = emp_branch[0]
+    emp_id = f'{letter}{number}'
+        
     data = [(emp_id, emp_name, emp_branch, emp_age, emp_salary)] #the information the user provides is be given as a tuple
     cur.executemany("INSERT INTO Employees VALUES(?, ?, ?, ?, ?)", data)
     con.commit()
@@ -28,14 +28,12 @@ def add_employees():
 
 def remove_employees():
     emp_id = [(int(input("Please enter the ID of the employee you would like to remove: ")))] #checks if employee exists
-    cur.execute("SELECT 1 from Employees WHERE EmployeeID = ?", emp_id)
-    results = cur.fetchall()
-    if(len(results) == 0):
-        print("Employee does not exist!")
-    else:
+    if check_employee(emp_id):
         cur.execute("DELETE from Employees WHERE EmployeeID=?", emp_id) #SQL statement to delete selected employee
         con.commit()
         print("Employee has been successfully removed!")
+    else:
+        print("This employee does not exist!")
     
 def update_employees(search_id):
     try:
@@ -72,27 +70,43 @@ def update_employees(search_id):
         pass
     
 def display_employees():
-    try: 
-        choice = int(input("Select an option: 1. Display Single Employee, 2. Display all employees, 3. Exit"))
-    except ValueError:
-        print("Invalid input")
+    while True:     
+        try: 
+            choice = int(input("Select an option: 1. Display Single Employee, 2. Display all employees, 3. Display Employees by Salary, 4. Display Employees by Branch, 5. Exit "))
+        except ValueError:
+            print("Invalid input")
+            continue
         
-    if choice == 1:
-        search_id = int(input("Enter the ID of the employee you want to display: ")) #Checks if employee exists
-        data = [search_id]
-        cur.execute("SELECT 1 from Employees WHERE EmployeeID = ?", data)
-        results = cur.fetchall()
-        if len(results) == 0:
-            print("This employee does not exist!")
+        if choice == 1:
+            search_id = int(input("Enter the ID of the employee you want to display: ")) #Checks if employee exists
+            if check_employee(search_id):
+                df = pd.read_sql_query("SELECT * from Employees", con) #Selects all employees, puts into dataframe
+                employee = df[df.EmployeeID == search_id] #select the employee equal to the ID entered
+                print(employee) #prints employee in dataframe form
+            else:
+                print("This employee does not exist!")
+        elif choice == 2:
+            df = pd.read_sql_query("SELECT * from Employees", con)
+            print(df)
+        elif choice == 3:
+            df = pd.read_sql_query("SELECT * from Employees ORDER BY Salary DESC", con)
+            print(df)
+        elif choice == 4:
+            df = pd.read_sql_query("SELECT * from Employees ORDER BY Branch", con)
+            print(df)
         else:
-            df = pd.read_sql_query("SELECT * from Employees", con) #Selects all employees, puts into dataframe
-            employee = df[df.EmployeeID == search_id] #select the employee equal to the ID entered
-            print(employee) #prints employee in dataframe form
-    elif choice == 2:
-        pass
+            print("Returning to main menu...\n\n")
+            break
+    
+def check_employee(search_id):
+    data = [search_id]
+    cur.execute("SELECT 1 from Employees WHERE EmployeeID = ?", data)
+    results = cur.fetchall()
+    if len(results) == 0:
+        return False
     else:
-        pass
-
+        return True
+    
 while True:
     print("\nWelcome to business management system!")
     try:
@@ -106,13 +120,10 @@ while True:
         remove_employees()
     elif choice == 3:
         search_id = int(input("Enter the ID of the employee you want to update: "))
-        data = [search_id]
-        cur.execute("SELECT 1 from Employees WHERE EmployeeID = ?", data)
-        results = cur.fetchall()
-        if len(results) == 0:
-            print("Employee does not exist!")
-        else:
+        if check_employee(search_id):
             update_employees(search_id)
+        else:
+            print("This employee does not exist!")
     elif choice == 4:
         display_employees()
     elif choice == 5:
